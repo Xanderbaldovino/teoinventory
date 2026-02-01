@@ -1,0 +1,149 @@
+.transaction-history {
+  animation: fadeIn 0.5s ease;
+}
+
+.transaction-history h2 {
+  color: #00d9ff;
+  margin-bottom: 25px;
+  text-align: center;
+  font-size: 1.8rem;
+  text-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+}
+
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.filter-bar button {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e0e0e0;
+  border: 2px solid rgba(0, 217, 255, 0.3);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.filter-bar button:hover {
+  background: rgba(0, 217, 255, 0.1);
+  border-color: #00d9ff;
+}
+
+.filter-bar button.active {
+  background: linear-gradient(135deg, #00d9ff 0%, #0099cc 100%);
+  color: #0a0e27;
+  border-color: #00d9ff;
+  font-weight: bold;
+}
+
+.empty-history {
+  text-align: center;
+  padding: 60px 20px;
+  color: #808080;
+  font-style: italic;
+}
+
+.history-table-wrapper {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 2px solid rgba(0, 217, 255, 0.3);
+  border-radius: 15px;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+  overflow-x: auto;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table thead tr {
+  border-bottom: 2px solid rgba(0, 217, 255, 0.5);
+}
+
+.history-table th {
+  color: #00d9ff;
+  text-align: left;
+  padding: 15px 10px;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.history-table tbody tr {
+  border-bottom: 1px solid rgba(0, 217, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.history-table tbody tr:hover {
+  background: rgba(0, 217, 255, 0.05);
+}
+
+.history-table td {
+  padding: 12px 10px;
+  color: #e0e0e0;
+  font-size: 0.95rem;
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.type-badge.direct-sale {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+  border: 1px solid rgba(76, 175, 80, 0.5);
+}
+
+.type-badge.consignment {
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+  border: 1px solid rgba(255, 193, 7, 0.5);
+}
+
+.type-badge.personal-use {
+  background: rgba(156, 39, 176, 0.2);
+  color: #9c27b0;
+  border: 1px solid rgba(156, 39, 176, 0.5);
+}
+
+.total-col {
+  font-weight: bold;
+  color: #00d9ff;
+}
+
+.delete-btn {
+  background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.delete-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 15px rgba(244, 67, 54, 0.6);
+}
+
+@media (max-width: 768px) {
+  .history-table {
+    font-size: 0.85rem;
+  }
+  
+  .history-table th,
+  .history-table td {
+    padding: 8px 5px;
+  }
+}
