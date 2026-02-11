@@ -185,6 +185,21 @@ def save_data(data):
     with open(DB_FILE, 'w') as f:
         json.dump(data, f, indent=2)
 
+def log_transaction_event(data, event_type, details):
+    """Log a transaction event to the audit history"""
+    if 'transaction_history' not in data:
+        data['transaction_history'] = []
+    
+    event = {
+        'id': len(data['transaction_history']) + 1,
+        'event_type': event_type,
+        'timestamp': datetime.now().isoformat(),
+        'details': details
+    }
+    
+    data['transaction_history'].append(event)
+    return event
+
 def calculate_financials(data):
     """Calculate all financial metrics"""
     cash_on_hand = 0
@@ -279,6 +294,18 @@ def handle_transactions():
         data['pending_transactions'] = []
     
     data['pending_transactions'].append(pending_transaction)
+    
+    # Log event
+    log_transaction_event(data, 'transaction_created', {
+        'transaction_id': pending_transaction['id'],
+        'type': txn_type,
+        'flavor': flavor,
+        'quantity': quantity,
+        'price': price,
+        'consignee': consignee,
+        'status': 'pending'
+    })
+    
     save_data(data)
     
     return jsonify({
@@ -347,6 +374,16 @@ def accept_transaction(txn_id):
     # Remove from pending
     data['pending_transactions'] = [t for t in data['pending_transactions'] if t['id'] != txn_id]
     
+    # Log event
+    log_transaction_event(data, 'transaction_accepted', {
+        'transaction_id': confirmed_txn['id'],
+        'type': confirmed_txn['type'],
+        'flavor': confirmed_txn['flavor'],
+        'quantity': confirmed_txn['quantity'],
+        'price': confirmed_txn['price'],
+        'consignee': confirmed_txn['consignee']
+    })
+    
     save_data(data)
     return jsonify({'message': 'Transaction accepted', 'transaction': confirmed_txn})
 
@@ -358,12 +395,30 @@ def reject_transaction(txn_id):
     if 'pending_transactions' not in data:
         return jsonify({'error': 'No pending transactions'}), 404
     
+    # Find the transaction before removing
+    rejected_txn = None
+    for t in data['pending_transactions']:
+        if t['id'] == txn_id:
+            rejected_txn = t
+            break
+    
     # Remove from pending
     initial_count = len(data['pending_transactions'])
     data['pending_transactions'] = [t for t in data['pending_transactions'] if t['id'] != txn_id]
     
     if len(data['pending_transactions']) == initial_count:
         return jsonify({'error': 'Transaction not found'}), 404
+    
+    # Log event
+    if rejected_txn:
+        log_transaction_event(data, 'transaction_rejected', {
+            'transaction_id': rejected_txn['id'],
+            'type': rejected_txn['type'],
+            'flavor': rejected_txn['flavor'],
+            'quantity': rejected_txn['quantity'],
+            'price': rejected_txn['price'],
+            'consignee': rejected_txn.get('consignee')
+        })
     
     save_data(data)
     return jsonify({'message': 'Transaction rejected and deleted'})
@@ -404,6 +459,17 @@ def delete_transaction(txn_id):
     # Remove transaction
     data['transactions'] = [t for t in data['transactions'] if t['id'] != txn_id]
     
+    # Log event
+    log_transaction_event(data, 'transaction_deleted', {
+        'transaction_id': txn_id,
+        'type': transaction['type'],
+        'flavor': flavor,
+        'quantity': quantity,
+        'price': transaction['price'],
+        'consignee': transaction.get('consignee'),
+        'inventory_restored': True
+    })
+    
     save_data(data)
     return jsonify({
         'message': 'Transaction deleted and inventory restored',
@@ -438,13 +504,172 @@ def mark_consignee_paid(name):
     for item in data['consignees'][name]:
         item['paid'] = True
     
+    # Calculate total paid
+    total_paid = sum(item['quantity'] * item['price'] for item in data['consignees'][name] if not item['paid'])
+    
     # Update transactions
     for txn in data['transactions']:
         if txn['consignee'] == name and not txn['paid']:
             txn['paid'] = True
     
+    # Log event
+    log_transaction_event(data, 'consignee_full_payment', {
+        'consignee': name,
+        'amount': round_currency(total_paid),
+        'payment_type': 'full'
+    })
+    
     save_data(data)
     return jsonify({'message': f'{name} marked as paid'})
+
+@app.route('/api/consignees/<name>/partial-pay', methods=['POST'])
+def partial_payment(name):
+    """Record a partial payment for a consignee"""
+    data = load_data()
+    
+    if name not in data['consignees']:
+        return jsonify({'error': 'Consignee not found'}), 404
+    
+    payment_data = request.json
+    amount = float(payment_data.get('amount', 0))
+    selected_items = payment_data.get('selected_items', [])  # List of item indices
+    
+    if amount <= 0:
+        return jsonify({'error': 'Payment amount must be greater than 0'}), 400
+    
+    # Calculate total debt
+    total_debt = sum(item['quantity'] * item['price'] for item in data['consignees'][name] if not item['paid'])
+    
+    if amount > total_debt:
+        return jsonify({'error': f'Payment amount (₱{amount:.2f}) exceeds total debt (₱{total_debt:.2f})'}), 400
+    
+    # Initialize payment tracking if not exists
+    if 'payments' not in data:
+        data['payments'] = {}
+    if name not in data['payments']:
+        data['payments'][name] = []
+    
+    # Record the payment
+    payment_record = {
+        'amount': round_currency(amount),
+        'timestamp': datetime.now().isoformat(),
+        'remaining_debt': round_currency(total_debt - amount),
+        'items_paid': []
+    }
+    
+    # If specific items are selected, pay those first
+    remaining_payment = amount
+    
+    if selected_items:
+        # Pay selected items first
+        for idx in selected_items:
+            if idx < len(data['consignees'][name]) and remaining_payment > 0:
+                item = data['consignees'][name][idx]
+                if not item['paid']:
+                    item_total = item['quantity'] * item['price']
+                    partial_paid = item.get('partial_payment', 0)
+                    item_remaining = item_total - partial_paid
+                    
+                    if remaining_payment >= item_remaining:
+                        # Fully pay this item
+                        item['paid'] = True
+                        remaining_payment -= item_remaining
+                        payment_record['items_paid'].append({
+                            'flavor': item['flavor'],
+                            'quantity': item['quantity'],
+                            'amount': item_remaining,
+                            'status': 'fully_paid'
+                        })
+                        
+                        # Update corresponding transaction
+                        for txn in data['transactions']:
+                            if (txn['consignee'] == name and 
+                                txn['flavor'] == item['flavor'] and 
+                                txn['quantity'] == item['quantity'] and
+                                not txn['paid']):
+                                txn['paid'] = True
+                                break
+                    else:
+                        # Partial payment for this item
+                        if 'partial_payment' not in item:
+                            item['partial_payment'] = 0
+                        item['partial_payment'] += remaining_payment
+                        payment_record['items_paid'].append({
+                            'flavor': item['flavor'],
+                            'quantity': item['quantity'],
+                            'amount': remaining_payment,
+                            'status': 'partially_paid'
+                        })
+                        remaining_payment = 0
+    else:
+        # No specific items selected, pay proportionally (FIFO)
+        for item in data['consignees'][name]:
+            if not item['paid'] and remaining_payment > 0:
+                item_total = item['quantity'] * item['price']
+                partial_paid = item.get('partial_payment', 0)
+                item_remaining = item_total - partial_paid
+                
+                if remaining_payment >= item_remaining:
+                    # Fully pay this item
+                    item['paid'] = True
+                    remaining_payment -= item_remaining
+                    payment_record['items_paid'].append({
+                        'flavor': item['flavor'],
+                        'quantity': item['quantity'],
+                        'amount': item_remaining,
+                        'status': 'fully_paid'
+                    })
+                    
+                    # Update corresponding transaction
+                    for txn in data['transactions']:
+                        if (txn['consignee'] == name and 
+                            txn['flavor'] == item['flavor'] and 
+                            txn['quantity'] == item['quantity'] and
+                            not txn['paid']):
+                            txn['paid'] = True
+                            break
+                else:
+                    # Partial payment for this item
+                    if 'partial_payment' not in item:
+                        item['partial_payment'] = 0
+                    item['partial_payment'] += remaining_payment
+                    payment_record['items_paid'].append({
+                        'flavor': item['flavor'],
+                        'quantity': item['quantity'],
+                        'amount': remaining_payment,
+                        'status': 'partially_paid'
+                    })
+                    remaining_payment = 0
+    
+    data['payments'][name].append(payment_record)
+    
+    # Log event
+    log_transaction_event(data, 'consignee_partial_payment', {
+        'consignee': name,
+        'amount': round_currency(amount),
+        'remaining_debt': round_currency(total_debt - amount),
+        'payment_type': 'partial',
+        'items_paid': payment_record['items_paid']
+    })
+    
+    save_data(data)
+    
+    return jsonify({
+        'message': f'Partial payment of ₱{amount:.2f} recorded for {name}',
+        'remaining_debt': round_currency(total_debt - amount),
+        'payment_record': payment_record
+    })
+
+@app.route('/api/consignees/<name>/payments', methods=['GET'])
+def get_payment_history(name):
+    """Get payment history for a consignee"""
+    data = load_data()
+    
+    if name not in data['consignees']:
+        return jsonify({'error': 'Consignee not found'}), 404
+    
+    payments = data.get('payments', {}).get(name, [])
+    return jsonify(payments)
 
 @app.route('/api/export', methods=['GET'])
 def export_excel():
@@ -597,6 +822,14 @@ def add_bulk_consignment():
             'total': round_currency(quantity * price)
         })
     
+    # Log event
+    log_transaction_event(data, 'bulk_consignment_added', {
+        'consignee': consignee,
+        'items_count': len(items),
+        'items': added_items,
+        'total': round_currency(sum(item['total'] for item in added_items))
+    })
+    
     save_data(data)
     
     return jsonify({
@@ -604,6 +837,36 @@ def add_bulk_consignment():
         'items': added_items,
         'total': round_currency(sum(item['total'] for item in added_items))
     }), 201
+
+@app.route('/api/transaction-history', methods=['GET'])
+def get_transaction_history():
+    """Get complete transaction history/audit log"""
+    data = load_data()
+    history = data.get('transaction_history', [])
+    
+    # Get filter parameters
+    event_type = request.args.get('event_type')
+    consignee = request.args.get('consignee')
+    limit = request.args.get('limit', type=int)
+    
+    # Apply filters
+    filtered_history = history
+    
+    if event_type:
+        filtered_history = [h for h in filtered_history if h['event_type'] == event_type]
+    
+    if consignee:
+        filtered_history = [h for h in filtered_history 
+                          if h['details'].get('consignee') == consignee]
+    
+    # Sort by newest first
+    filtered_history = sorted(filtered_history, key=lambda x: x['timestamp'], reverse=True)
+    
+    # Apply limit
+    if limit:
+        filtered_history = filtered_history[:limit]
+    
+    return jsonify(filtered_history)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

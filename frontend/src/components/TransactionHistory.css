@@ -2,12 +2,50 @@
   animation: fadeIn 0.5s ease;
 }
 
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
 .transaction-history h2 {
   color: #00d9ff;
-  margin-bottom: 25px;
-  text-align: center;
   font-size: 1.8rem;
   text-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+  margin: 0;
+}
+
+.view-mode-toggle {
+  display: flex;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 5px;
+  border-radius: 10px;
+  border: 2px solid rgba(0, 217, 255, 0.3);
+}
+
+.view-mode-toggle button {
+  background: transparent;
+  color: #e0e0e0;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.view-mode-toggle button:hover {
+  background: rgba(0, 217, 255, 0.1);
+}
+
+.view-mode-toggle button.active {
+  background: linear-gradient(135deg, #00d9ff 0%, #0099cc 100%);
+  color: #0a0e27;
+  font-weight: bold;
 }
 
 .filter-bar {
@@ -137,7 +175,112 @@
   box-shadow: 0 4px 15px rgba(244, 67, 54, 0.6);
 }
 
+/* Audit Log Styles */
+.audit-log-view {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 2px solid rgba(0, 217, 255, 0.3);
+  border-radius: 15px;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+}
+
+.audit-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.audit-log-item {
+  display: flex;
+  gap: 15px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(0, 217, 255, 0.2);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.audit-log-item:hover {
+  background: rgba(0, 217, 255, 0.05);
+  border-color: rgba(0, 217, 255, 0.4);
+  transform: translateX(5px);
+}
+
+.audit-icon {
+  font-size: 2rem;
+  min-width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.audit-content {
+  flex: 1;
+}
+
+.audit-description {
+  color: #e0e0e0;
+  font-size: 1rem;
+  margin-bottom: 5px;
+  line-height: 1.5;
+}
+
+.audit-timestamp {
+  color: #808080;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.audit-items-detail {
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(0, 217, 255, 0.05);
+  border-left: 3px solid #00d9ff;
+  border-radius: 5px;
+}
+
+.audit-items-detail strong {
+  color: #00d9ff;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.audit-items-detail ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.audit-items-detail li {
+  padding: 5px 0;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+}
+
+.status-fully_paid {
+  color: #4caf50;
+  font-weight: bold;
+}
+
+.status-partially_paid {
+  color: #ffc107;
+  font-weight: bold;
+}
+
 @media (max-width: 768px) {
+  .history-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .view-mode-toggle {
+    width: 100%;
+  }
+  
+  .view-mode-toggle button {
+    flex: 1;
+  }
+  
   .history-table {
     font-size: 0.85rem;
   }
@@ -145,5 +288,14 @@
   .history-table th,
   .history-table td {
     padding: 8px 5px;
+  }
+  
+  .audit-log-item {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .audit-icon {
+    font-size: 1.5rem;
   }
 }
